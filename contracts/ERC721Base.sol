@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
-contract NFTBase is ERC721Enumerable, ERC721URIStorage, AccessControlEnumerable {
+contract ERC721Base is ERC721Enumerable, ERC721URIStorage, AccessControlEnumerable {
     // BaseURI for the token metadata
     string private _internalBaseURI;
 
