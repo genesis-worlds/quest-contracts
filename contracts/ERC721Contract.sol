@@ -66,7 +66,7 @@ contract ERC721Contract is ERC721Base {
         emit SetGameContract(id, gameContract, true);
     }
 
-    function deactivateGameContract(address gameContract, bool isActive) external onlyAdmin {
+    function activateGameContract(address gameContract, bool isActive) external onlyAdmin {
         require(gameContractIds[gameContract] > 0);
 
         activeGameContracts[gameContract] = isActive;
@@ -137,18 +137,19 @@ contract ERC721Contract is ERC721Base {
     /**
      * @dev This is used by any function that requires a block hash to power a random result. It's a way to lock in random results safely.
      */
-    function fillBlockHash(uint256 blockNumber) public returns (bytes32 seed) {
-        if (neededBlockHash > 1) {
-            if (block.number - blockNumber > 255) {
-                blockNumber = block.number + blockNumber % 256 - 256;
+    function fillBlockHash() public returns(uint256 blockToGet) {
+        uint256 hashToGet = neededBlockHash;
+        blockToGet = block.number + 1;
+        if (hashToGet <= block.number) {
+            if (block.number - hashToGet > 255) {
+                hashToGet = block.number + hashToGet % 256 - 256;
             }
-            blockHashes[blockNumber] = blockhash(blockNumber);
-            neededBlockHash = 1;
-            seed = blockHashes[blockNumber];
+            blockHashes[neededBlockHash] = blockhash(hashToGet);
+            neededBlockHash = blockToGet;
         }
     }
 
-    function getRandomResult(bytes32 input, uint256 blockNumber) internal view returns (bytes32) {
+    function getRandomResult(bytes32 input, uint256 blockNumber) external view returns (bytes32) {
         require(blockHashes[blockNumber] != bytes32(0));
         return keccak256(abi.encode(input, blockHashes[blockNumber]));
     }

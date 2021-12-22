@@ -19,10 +19,6 @@ contract GameContract is AccessControlEnumerable, ReentrancyGuard {
     uint256 public packPrice = 1000 * 1e18;
     uint256 public neededBlockNumber;
 
-    // These two variables are to power the commit & confirm randomness system.
-    uint256 neededBlockHash = 1;
-    mapping(uint256 => bytes32) blockHashes;
-
     mapping(uint256 => uint256) public buyPackBlockNumber;
 
     modifier onlyAdmin {
@@ -45,26 +41,6 @@ contract GameContract is AccessControlEnumerable, ReentrancyGuard {
         return true;
     }
 
-
-    /**
-     * @dev This is used by any function that requires a block hash to power a random result. It’s a way to lock in random results safely.
-     */
-    function fillBlockHash(uint256 blockNumber) public returns (bytes32 seed) {
-        if (neededBlockHash > 1) {
-            if (block.number - blockNumber > 255) {
-                blockNumber = block.number + blockNumber % 256 - 256;
-            }
-            blockHashes[blockNumber] = blockhash(blockNumber);
-            neededBlockHash = 1;
-            seed = blockHashes[blockNumber];
-        }
-    }
-
-    function getRandomResult(bytes32 input, uint256 blockNumber) internal view returns (bytes32) {
-        require(blockHashes[blockNumber] != bytes32(0));
-        return keccak256(abi.encode(input, blockHashes[blockNumber]));
-    }
-
     function withdrawAnyErc20(address token) external onlyAdmin {
         IERC20(token).safeTransfer(msg.sender, IERC20(token).balanceOf(address(this)));
     }
@@ -74,22 +50,25 @@ contract GameContract is AccessControlEnumerable, ReentrancyGuard {
     }
 
     function buyItemPack() public nonReentrant {
-        fillBlockHash(0);
         IERC20(GENESIS).safeTransferFrom(msg.sender, address(this), packPrice);
 
         // mint itemPack NFT
         uint256 packId = erc721.mintToken(uint64(1), msg.sender, bytes32(0));
-        require(buyPackBlockNumber[packId] == 0);
-        buyPackBlockNumber[packId] = block.number + 1;
+        require(buyPackBlockNumber[packId] <= 1);
+        buyPackBlockNumber[packId] = erc721.fillBlockHash();
         neededBlockNumber = block.number + 1;
     }
 
     function openItemPack(uint256 packId) public {
         require(erc721.ownerOf(packId) == msg.sender);
+
         uint256 blockNumber = buyPackBlockNumber[packId];
-        require(blockNumber > 0);
-        bytes32 seed = fillBlockHash(blockNumber);
+        require(blockNumber > 1 && blockNumber <= block.number);
+        buyPackBlockNumber[packId] = 1;
+        erc721.fillBlockHash();
+        bytes32 seed = erc721.getRandomResult(bytes32(uint256(uint160(msg.sender))), blockNumber);
         require(seed != bytes32(0));
+
         erc721.burnToken(packId);
         seed = createPackItem(seed);
         seed = createPackItem(seed);
